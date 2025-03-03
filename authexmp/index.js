@@ -1,26 +1,36 @@
-// filepath: index.js
 const express = require('express');
 const bodyParser = require('body-parser');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 
 const app = express();
 app.use(bodyParser.json());
 
-const users = []; // This will act as our in-memory database
+mongoose.connect('mongodb://localhost:27017/authexmp', { useNewUrlParser: true, useUnifiedTopology: true })
+    .then(() => console.log('MongoDB connected'))
+    .catch(err => console.error('MongoDB connection error:', err));
+
+const userSchema = new mongoose.Schema({
+    username: String,
+    password: String
+});
+
+const User = mongoose.model('User', userSchema);
 
 // Register route
 app.post('/register', async (req, res) => {
     const { username, password } = req.body;
     const hashedPassword = await bcrypt.hash(password, 10);
-    users.push({ username, password: hashedPassword });
+    const user = new User({ username, password: hashedPassword });
+    await user.save();
     res.status(201).send('User registered');
 });
 
 // Login route
 app.post('/login', async (req, res) => {
     const { username, password } = req.body;
-    const user = users.find(u => u.username === username);
+    const user = await User.findOne({ username });
     if (user && await bcrypt.compare(password, user.password)) {
         const token = jwt.sign({ username: user.username }, 'secretkey');
         res.json({ token });
